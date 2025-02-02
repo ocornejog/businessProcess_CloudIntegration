@@ -27,6 +27,39 @@ class LoanApplicationProcessor:
         self.verification_attempts = 0
         self.MAX_VERIFICATION_ATTEMPTS = 3
 
+    async def _verify_completeness(self, loan_application: LoanApplication) -> dict:
+        """
+        Calls the verify_completion task to check the completeness of the loan application.
+        """
+        loan_data = {
+            'application_id': loan_application.application_id,
+            'client_name': loan_application.client_name,
+            'address': loan_application.address,
+            'email': loan_application.email,
+            'phone': loan_application.phone,
+            'loan_amount': loan_application.loan_amount,
+            'loan_duration_years': loan_application.loan_duration_years,
+            'property_description': loan_application.property_description,
+            'monthly_income': loan_application.monthly_income,
+            'monthly_expenses': loan_application.monthly_expenses
+        }
+        # Convert Decimal to str for logging
+        loan_data_str = {k: str(v) if isinstance(v, Decimal) else v for k, v in loan_data.items()}
+        self.process_logger.log_step("Calling verify_completion with loan_data", loan_data_str)
+        result = verify_completion.apply(args=[loan_data])
+        try:
+            response = result.get()
+            # Convert Decimal to str for logging
+            response_str = {k: str(v) if isinstance(v, Decimal) else v for k, v in response.items()}
+            self.process_logger.log_step("Received response from verify_completion", response_str)
+            return response
+        except Exception as e:
+            self.process_logger.log_step("Error in verify_completion", {
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            })
+            raise
+
     async def process_loan_application(self, loan_application: LoanApplication) -> Dict[str, Any]:
         """
         Main processing method following BPMN diagram flow exactly.
@@ -80,8 +113,11 @@ class LoanApplicationProcessor:
             )
 
             # Verify completeness
-            verification_result = await self._verify_completeness()
-            
+            verification_result = await self._verify_completeness(self.application)
+            # Convert Decimal to str for logging
+            verification_result_str = {k: str(v) if isinstance(v, Decimal) else v for k, v in verification_result.items()}
+            self.process_logger.log_step("Verification result", verification_result_str)
+
             if verification_result['is_complete']:
                 self.process_logger.log_step("Application Verified Complete", {
                     "attempts": self.verification_attempts
@@ -154,15 +190,18 @@ class LoanApplicationProcessor:
         Evaluates property as shown in BPMN diagram.
         """
         self.process_logger.log_step("Starting Property Evaluation")
-        
+
         property_data = {
             'application_id': self.application.application_id,
             'property_description': self.application.property_description,
             'loan_amount': float(self.application.loan_amount)
         }
+
+        # Log property data
+        self.process_logger.log_step("Property Data", property_data)
         
         # Simulate property evaluation
-        await asyncio.sleep(3)
+        # await asyncio.sleep(3)
         
         # In real implementation, this would call a property evaluation service
         evaluation_result = {
