@@ -1,0 +1,11 @@
+{
+    "max_monthly_payment": 5000.00,
+    "max_duration_years": 30,
+    "max_repayment_ratio": 1.6,
+    "min_payment_buffer": 0.1,
+    "required_documentation": [
+        "income_proof",
+        "identity_verification",
+        "property_assessment"
+    ]
+} 
