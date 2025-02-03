@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 from typing import Dict, Any
+from decimal import Decimal
 
 class ProcessLogger:
     def __init__(self, base_dir: str = "logs"):
@@ -52,6 +53,12 @@ class ProcessLogger:
 
     def log_step(self, step: str, details: Dict[str, Any] = None):
         """Log a process step with details"""
+        # Ensure details is a dictionary and handle None
+        details = details or {}
+        
+        # Convert any Decimal values to strings
+        details = self._convert_decimals(details)
+        
         # Format details for readable logging
         details_str = json.dumps(details, indent=2) if details else ""
         separator = "="*80
@@ -68,12 +75,22 @@ class ProcessLogger:
         step_data = {
             'timestamp': datetime.now().isoformat(),
             'step': step,
-            'details': details or {}
+            'details': details
         }
         self.process_data['steps'].append(step_data)
         
         # Update JSON file after each step
         self._save_json_log()
+
+    def _convert_decimals(self, data: Any) -> Any:
+        """Recursively convert Decimal objects to strings in dictionaries and lists"""
+        if isinstance(data, dict):
+            return {k: self._convert_decimals(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._convert_decimals(item) for item in data]
+        elif isinstance(data, Decimal):
+            return str(data)
+        return data
 
     def finalize_process(self, final_status: str, summary: Dict[str, Any] = None):
         """Finalize the process log with summary information"""
@@ -102,8 +119,10 @@ class ProcessLogger:
 
     def _save_json_log(self):
         """Save the current process data to JSON file"""
+        # Convert any Decimal values before saving
+        process_data = self._convert_decimals(self.process_data)
         with open(self.json_log_file, 'w', encoding='utf-8') as f:
-            json.dump(self.process_data, f, indent=2, ensure_ascii=False)
+            json.dump(process_data, f, indent=2, ensure_ascii=False)
 
     @staticmethod
     def load_process_log(json_file_path: str) -> Dict[str, Any]:

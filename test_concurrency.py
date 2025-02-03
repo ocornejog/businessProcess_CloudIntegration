@@ -45,12 +45,16 @@ class LoanApplicationGenerator:
         city = random.choice(self.cities)
         
         # Generate realistic financial values with some variation
-        base_loan_amount = Decimal(str(random.randint(200000, 3000000)))
-        base_monthly_income = base_loan_amount / 200  # Realistic income to loan ratio
+        # Base loan amount between 200k and 800k for more realistic scenarios
+        base_loan_amount = Decimal(str(random.randint(200000, 800000)))
         
-        # Add some randomness to make each application unique
-        monthly_income = base_monthly_income * Decimal(str(random.uniform(0.9, 1.1)))
-        monthly_expenses = monthly_income * Decimal(str(random.uniform(0.2, 0.4)))
+        # Monthly income that satisfies the income multiplier rule (loan_amount / annual_income <= 3)
+        min_annual_income = base_loan_amount / Decimal('3')
+        min_monthly_income = min_annual_income / Decimal('12')
+        
+        # Add some randomness to make each application unique but still eligible
+        monthly_income = min_monthly_income * Decimal(str(random.uniform(1.0, 1.5)))
+        monthly_expenses = monthly_income * Decimal(str(random.uniform(0.2, 0.35)))  # Keep DTI ratio reasonable
         
         return LoanApplication(
             client_name=client_name,
@@ -69,8 +73,9 @@ class ConcurrentProcessingTester:
     Manages concurrent processing of multiple loan applications.
     Tracks performance metrics and ensures proper handling of parallel requests.
     """
-    def __init__(self, num_applications: int):
+    def __init__(self, num_applications: int, batch_size: int = 50):
         self.num_applications = num_applications
+        self.batch_size = min(batch_size, num_applications)  # Ensure batch size doesn't exceed total applications
         self.generator = LoanApplicationGenerator()
         self.results: List[Dict[str, Any]] = []
         self.start_time = None
@@ -105,7 +110,6 @@ class ConcurrentProcessingTester:
                 'processing_time': processing_time,
                 'success': False
             }
-        
 
     async def run_concurrent_test(self):
         """
@@ -115,20 +119,23 @@ class ConcurrentProcessingTester:
         print(f"\nStarting concurrent processing test with {self.num_applications} applications...")
         self.start_time = time.time()
         
-        # Generate applications
+        # Generate all applications upfront
         applications = [
             self.generator.generate_application(i)
             for i in range(self.num_applications)
         ]
         
-        # Process applications concurrently
-        tasks = [
-            self.process_application(application)
-            for application in applications
-        ]
+        # Process applications in batches for better performance
+        for i in range(0, len(applications), self.batch_size):
+            batch = applications[i:i + self.batch_size]
+            tasks = [self.process_application(app) for app in batch]
+            batch_results = await asyncio.gather(*tasks)
+            self.results.extend(batch_results)
+            
+            # Print progress
+            processed = len(self.results)
+            print(f"Processed {processed}/{self.num_applications} applications...")
         
-        # Wait for all applications to be processed
-        self.results = await asyncio.gather(*tasks)
         self.end_time = time.time()
         
         # Generate and save test report
@@ -191,10 +198,11 @@ async def main():
     Allows specification of the number of concurrent applications to process.
     """
     # Number of concurrent applications to process
-    num_applications = 10
+    num_applications = 100  # Increased number of applications
+    batch_size = 50  # Process 50 applications at a time
     
     # Create and run the tester
-    tester = ConcurrentProcessingTester(num_applications)
+    tester = ConcurrentProcessingTester(num_applications, batch_size)
     await tester.run_concurrent_test()
 
 if __name__ == "__main__":

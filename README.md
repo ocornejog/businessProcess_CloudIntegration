@@ -15,27 +15,57 @@ The system begins by ensuring all required application components are present an
 - Automated notification system for required updates
 
 ### Phase 2: Parallel Eligibility Processing
-Once an application is complete, the system conducts two parallel evaluation processes:
+Once an application is complete, the system conducts eligibility evaluation:
 
-1. Credit History Verification
-   - Credit score assessment
-   - Payment history analysis
-   - Debt-to-income ratio calculation
-
-2. Property Evaluation
-   - Property value assessment
-   - Location analysis
-   - Risk evaluation
-   - Loan-to-value ratio calculation
+- Debt-to-Income (DTI) Ratio Analysis
+  - Maximum allowed DTI ratio: 43%
+  - Calculated as: Monthly Expenses / Monthly Income
+- Credit Score Assessment
+  - Minimum required score: 650
 
 ### Phase 3: Reimbursement Agreement
-For approved applications, the system handles the agreement process:
+For approved applications, the system handles the agreement process with the following rules:
 
-- Generation of reimbursement schedules
-- Interest rate calculations
-- Agreement document preparation
-- Customer review tracking
-- Final approval processing
+#### Reimbursement Rules
+```json
+{
+    "max_monthly_payment": 5000.00,        // Maximum allowed monthly payment
+    "max_duration_years": 30,              // Maximum loan duration
+    "max_repayment_ratio": 1.6,           // Total repayment can't exceed 160% of loan
+    "min_payment_buffer": 0.1,            // 10% buffer required in payment capacity
+    "required_documentation": [
+        "income_proof",
+        "identity_verification",
+        "property_assessment"
+    ]
+}
+```
+
+#### Residency Insurance Option
+- Optional insurance offering during agreement phase
+- Provides coverage for:
+  - Fire damage
+  - Theft protection
+  - Water damage
+- Monthly cost: €45.00
+
+## Application Statuses
+
+The system uses the following status codes throughout the process:
+
+| Status Code | Description | Trigger Condition |
+|-------------|-------------|------------------|
+| RECEIVED | Initial application status | Application submitted |
+| INCOMPLETE | Missing required information | Verification check fails |
+| COMPLETE | All required fields present | Verification check passes |
+| UNDER_REVIEW | Application in evaluation | Eligibility check started |
+| REJECTED_INCOMPLETE | Final rejection status | Max verification attempts reached |
+| REJECTED_INELIGIBLE | Final rejection status | Failed eligibility criteria (DTI > 43%) |
+| REJECTED | Final rejection status | Failed reimbursement rules |
+| PENDING_AGREEMENT | Awaiting agreement completion | Passed eligibility, preparing agreement |
+| AGREEMENT_ACCEPTED | Agreement signed | Customer accepts terms |
+| AGREEMENT_REJECTED | Agreement declined | Customer rejects terms |
+| COMPLETED_APPLICATION | Final success status | All checks passed, agreement accepted |
 
 ## Project Structure
 
@@ -84,7 +114,7 @@ You can modify these settings in `services/config.py`.
 
 ## Running the System
 
-1. Start the service workers (in separate terminals):
+1. Start the service workers:
 ```bash
 # Terminal 1 - Completeness Service
 celery -A services.completeness:app worker --loglevel=INFO -Q completeness
@@ -100,6 +130,20 @@ celery -A services.reimbursement:app worker --loglevel=INFO -Q reimbursement
 ```bash
 python main.py
 ```
+
+## Testing
+
+Run the test suite to verify pipeline functionality:
+```bash
+python test_reimbursement.py
+```
+
+The test suite covers:
+- Completeness verification
+- Eligibility criteria
+- Reimbursement rules
+- Insurance options
+- Various status transitions
 
 ## Monitoring and Logs
 
@@ -119,7 +163,6 @@ The system provides comprehensive logging and monitoring capabilities:
    - Access the management interface at http://localhost:15672
    - Monitor queue status and message flow
    - Track service performance
-
 
 ## License
 
